@@ -36,13 +36,13 @@ const transformFollowup = (followup) => ({
     isFavourite: followup.customer?.isFavourite || false,
     AssignTo: followup.customer?.AssignTo
       ? {
-          _id: followup.customer.AssignTo.id,
-          name: followup.customer.AssignTo.name,
-          email: followup.customer.AssignTo.email,
-          role: followup.customer.AssignTo.role,
-          city: followup.customer.AssignTo.city,
-          status: followup.customer.AssignTo.status,
-        }
+        _id: followup.customer.AssignTo.id,
+        name: followup.customer.AssignTo.name,
+        email: followup.customer.AssignTo.email,
+        role: followup.customer.AssignTo.role,
+        city: followup.customer.AssignTo.city,
+        status: followup.customer.AssignTo.status,
+      }
       : null,
     CreatedBy: followup.customer?.CreatedBy || null,
     isImported: followup.customer?.isImported || false,
@@ -68,13 +68,13 @@ const transformFollowup = (followup) => ({
   ContactNumber: followup.customer?.ContactNumber || "",
   AssignTo: followup.customer?.AssignTo
     ? {
-        _id: followup.customer.AssignTo.id,
-        name: followup.customer.AssignTo.name,
-        email: followup.customer.AssignTo.email,
-        role: followup.customer.AssignTo.role,
-        city: followup.customer.AssignTo.city,
-        status: followup.customer.AssignTo.status,
-      }
+      _id: followup.customer.AssignTo.id,
+      name: followup.customer.AssignTo.name,
+      email: followup.customer.AssignTo.email,
+      role: followup.customer.AssignTo.role,
+      city: followup.customer.AssignTo.city,
+      status: followup.customer.AssignTo.status,
+    }
     : null,
 });
 
@@ -161,6 +161,9 @@ export const getFollowups = async (req, res, next) => {
       customerFilter.AssignTo = {
         name: { contains: User.trim() },
       };
+    }
+    if (admin.role === "user") {
+      customerFilter.AssignTo = { id: admin.id }; // <── FIX
     }
 
     // Keyword filter

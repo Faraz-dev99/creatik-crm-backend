@@ -1,5 +1,7 @@
+import cloudinary from "../config/cloudinary.js";
 import prisma from "../config/prismaClient.js";
 import ApiError from "../utils/ApiError.js";
+import fs from "fs";
 
 export const transformTemplate = (tpl) => ({
   _id: tpl.id,
@@ -7,6 +9,7 @@ export const transformTemplate = (tpl) => ({
   type: tpl.type,
   subject: tpl.subject,
   body: tpl.body,
+  whatsappImage:tpl.whatsappImage,
   description: tpl.description,
   createdBy: tpl.createdBy,
   status: tpl.status,
@@ -25,6 +28,8 @@ export const createTemplate = async (req, res, next) => {
       status = "Active",
     } = req.body;
 
+    let whatsappImage=[];
+
     if (!name || !type || !body) {
       return next(new ApiError(400, "name, type and body are required"));
     }
@@ -36,18 +41,51 @@ export const createTemplate = async (req, res, next) => {
     if (existing) {
       return next(new ApiError(409, "Template with this name already exists"));
     }
+    if (req.files?.whatsappImage) {
+      const uploads = req.files.whatsappImage.map((file) =>
+        cloudinary.uploader
+          .upload(file.path, {
+            folder: "templates/whatsapp_images",
+            transformation: [{ width: 1000, crop: "limit" }],
+          })
+          .then((upload) => {
+            fs.unlinkSync(file.path);
+            return upload.secure_url;
+          })
+      );
+      whatsappImage = await Promise.all(uploads);
+    }
 
-    const newTemplate = await prisma.template.create({
-      data: {
-        name,
-        type,
-        subject,
-        body,
-        description,
-        status,
-        createdBy: req.user?.id || "system",
-      },
-    });
+    let newTemplate = "";
+    if (whatsappImage) {
+      newTemplate = await prisma.template.create({
+        data: {
+          name,
+          type,
+          subject,
+          body,
+          whatsappImage: whatsappImage,
+          description,
+          status,
+          createdBy: req.user?.id || "system",
+        },
+      });
+    }
+    else {
+      newTemplate = await prisma.template.create({
+        data: {
+          name,
+          type,
+          subject,
+          body,
+          description,
+          status,
+          createdBy: req.user?.id || "system",
+        },
+      });
+    }
+
+
 
     res.status(201).json({
       success: true,
@@ -139,20 +177,118 @@ export const getTemplateById = async (req, res, next) => {
 
 export const updateTemplate = async (req, res, next) => {
   try {
-    const clean = { ...req.body };
+    let clean = { ...req.body };
 
-    // Prisma forbidden update fields
+    // FORBIDDEN FIELDS
     delete clean._id;
     delete clean.id;
     delete clean.createdAt;
     delete clean.updatedAt;
 
+    // ============================
+    //  BOOLEAN PARSER FOR removeImage
+    // ============================
+    const toBoolean = (val) => {
+      if (val === undefined || val === null) return undefined;
+      if (typeof val === "boolean") return val;
+      if (typeof val === "string") {
+        const lower = val.toLowerCase().trim();
+        if (lower === "true") return true;
+        if (lower === "false") return false;
+      }
+      return undefined;
+    };
+
+    clean.removeImage = toBoolean(clean.removeImage);
+
+    // ============================
+    //  FETCH EXISTING TEMPLATE
+    // ============================
+    const existing = await prisma.template.findUnique({
+      where: { id: req.params.id },
+    });
+
+    if (!existing) {
+      return next(new ApiError(404, "Template not found"));
+    }
+
+    // Convert to array if stored as JSON/string
+    let existingImages = [];
+    try {
+      existingImages = JSON.parse(existing.whatsappImage || "[]");
+    } catch {
+      existingImages = Array.isArray(existing.whatsappImage)
+        ? existing.whatsappImage
+        : [];
+    }
+
+    // Function to extract Cloudinary publicId
+    const getPublicId = (url) => {
+      if (!url) return null;
+      const parts = url.split("/");
+      const last = parts[parts.length - 1];
+      return last.split(".")[0]; // remove extension
+    };
+
+    // ======================================================
+    //        REMOVE EXISTING IMAGE IF removeImage = true
+    // ======================================================
+    if (clean.removeImage === true) {
+      if (existingImages.length > 0) {
+        const publicId = getPublicId(existingImages[0]);
+
+        if (publicId) {
+          await cloudinary.uploader.destroy(
+            `templates/whatsapp_images/${publicId}`
+          );
+        }
+      }
+
+      clean.whatsappImage = []; // clear DB field
+    }
+
+    // ======================================================
+    //        UPLOAD NEW WHATSAPP IMAGE (ONLY ONE)
+    // ======================================================
+    if (req.files?.whatsappImage) {
+      const file = req.files.whatsappImage[0];
+
+      // If user uploads a new image AND removeImage=true → conflict
+      if (clean.removeImage === true) {
+        return next(
+          new ApiError(
+            400,
+            "Cannot upload a new WhatsApp image while removeImage=true"
+          )
+        );
+      }
+
+      const upload = await cloudinary.uploader.upload(file.path, {
+        folder: "templates/whatsapp_images",
+        transformation: [{ width: 1000, crop: "limit" }],
+      });
+
+      fs.unlinkSync(file.path);
+
+      // Save new image
+      clean.whatsappImage = [upload.secure_url];
+    }
+
+    // remove removeImage from final DB update
+    delete clean.removeImage;
+
+    // ======================================================
+    // UPDATE TEMPLATE
+    // ======================================================
     const updated = await prisma.template.update({
       where: { id: req.params.id },
       data: clean,
     });
 
-    res.status(200).json({ success: true, data: transformTemplate(updated) });
+    res.status(200).json({
+      success: true,
+      data: transformTemplate(updated),
+    });
   } catch (err) {
     if (err.code === "P2025") {
       return next(new ApiError(404, "Template not found"));
@@ -160,6 +296,7 @@ export const updateTemplate = async (req, res, next) => {
     next(new ApiError(500, err.message));
   }
 };
+
 
 export const deleteTemplate = async (req, res, next) => {
   try {

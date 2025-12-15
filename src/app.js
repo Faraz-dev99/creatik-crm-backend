@@ -32,6 +32,7 @@ import contactRoutes from "./routes/route.contact.js";
 import cookieParser from "cookie-parser";
 import confollowaddRoutes from "./routes/route.confollowadd.js";
 import messageRoutes from "./routes/route.messages.js";
+import requestUserRoutes from "./routes/route.requestUser.js";
 const app = express();
 app.use(cookieParser());
 
@@ -51,6 +52,7 @@ app.use(express.json());
 
 // Routes
 
+app.use("/api/user",requestUserRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/mas/cam", campaignRoutes);
 app.use("/api/mas/type", typeRoutes);

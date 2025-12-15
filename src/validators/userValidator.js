@@ -57,3 +57,26 @@ export const updateUserValidator = [
       "Password must be at least 6 characters long and include one uppercase letter, one number, and one special character"
     ),
 ];
+
+
+export const userSignupValidator = [
+  body("email")
+    .notEmpty()
+    .withMessage("Email is required")
+    .isEmail()
+    .withMessage("Please provide a valid email address"),
+
+  body("name")
+    .notEmpty()
+    .withMessage("name is required")
+    .isLength({ min: 3 })
+    .withMessage("name must be at least 3 characters long"),
+
+  body("password")
+    .notEmpty()
+    .withMessage("Password is required")
+    .matches(strongPasswordRegex)
+    .withMessage(
+      "Password must be at least 6 characters long and include one uppercase letter, one number, and one special character"
+    ),
+];

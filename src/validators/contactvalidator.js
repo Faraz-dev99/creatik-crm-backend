@@ -61,7 +61,7 @@ export const createContactValidator = [
     .isISO8601()
     .withMessage("date must be in ISO8601 format (YYYY-MM-DD)"),
 
-  body("Email").optional().isEmail().withMessage("Email must be valid"),
+  body("Email").optional({ checkFalsy: true }).isEmail().withMessage("Email must be valid"),
 
   body("CompanyName")
     .optional()
@@ -140,7 +140,7 @@ export const updateContactValidator = [
     .isISO8601()
     .withMessage("date must be in ISO8601 format (YYYY-MM-DD)"),
 
-  body("Email").optional().isEmail().withMessage("Email must be valid"),
+  body("Email").optional({ checkFalsy: true }).isEmail().withMessage("Email must be valid"),
 
   body("CompanyName")
     .optional()

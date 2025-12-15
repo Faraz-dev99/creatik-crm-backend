@@ -116,6 +116,7 @@ export const createConFollowup = async (req, res, next) => {
 
 export const getConFollowups = async (req, res, next) => {
   try {
+    const admin = req.admin;
     const {
       page = 1,
       limit = 10,
@@ -150,6 +151,11 @@ export const getConFollowups = async (req, res, next) => {
         name: { contains: User.trim() },
       };
     }
+
+    if (admin.role === "user") {
+      contactFilter.AssignTo = { id: admin.id }; // <── FIX
+    }
+
 
     if (keyword) {
       const kw = keyword.trim();

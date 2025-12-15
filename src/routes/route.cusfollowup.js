@@ -8,6 +8,7 @@ import {
   updateFollowup,
   deleteFollowupsByCustomer,
 } from "../controllers/controller.cusfollowup.js";
+import { protectRoute } from "../middlewares/auth.js";
 
 const followupRoutes = express.Router();
 
@@ -15,7 +16,7 @@ const followupRoutes = express.Router();
 followupRoutes.post("/:customerId", createFollowup);
 
 // Get all follow-ups with pagination
-followupRoutes.get("/", getFollowups);
+followupRoutes.get("/",protectRoute, getFollowups);
 
 // Get all follow-ups of one customer
 followupRoutes.get("/customer/:customerId", getFollowupByCustomer);

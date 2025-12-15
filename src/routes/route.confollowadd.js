@@ -8,6 +8,7 @@ import {
   deleteConFollowup,
   deleteConFollowupsByContact,
 } from "../controllers/controller.confollow.js";
+import { protectRoute } from "../middlewares/auth.js";
 
 const confollowaddRoutes = express.Router();
 
@@ -15,7 +16,7 @@ const confollowaddRoutes = express.Router();
 confollowaddRoutes.post("/:contactId", createConFollowup);
 
 // ✅ Get all follow-ups (with pagination and filters)
-confollowaddRoutes.get("/", getConFollowups);
+confollowaddRoutes.get("/",protectRoute, getConFollowups);
 
 // ✅ Get all follow-ups for one specific contact
 confollowaddRoutes.get("/contact/:contactId", getConFollowupByContact);

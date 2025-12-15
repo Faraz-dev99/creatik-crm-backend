@@ -145,16 +145,32 @@ export const importCustomers = async (req, res, next) => {
     // ----------------------------
     // Duplicate check (EMAIL ONLY)
     // ----------------------------
-    const emails = valid.map((v) => v.Email).filter(Boolean);
+    /*  const emails = valid.map((v) => v.Email).filter(Boolean);
+ 
+     const existing = await prisma.customer.findMany({
+       where: {
+         Email: { in: emails },
+       },
+       select: { Email: true },
+     });
+ 
+     const existingEmails = new Set(existing.map((e) => e.Email)); */
 
-    const existing = await prisma.customer.findMany({
+    // collect contact numbers from incoming rows
+    const contactNumbers = valid.map((v) => v.ContactNumber);
+
+    // find all existing customers with same contact numbers
+    const existingByPhone = await prisma.customer.findMany({
       where: {
-        Email: { in: emails },
+        ContactNumber: { in: contactNumbers },
       },
-      select: { Email: true },
+      select: { ContactNumber: true },
     });
 
-    const existingEmails = new Set(existing.map((e) => e.Email));
+    // store them in a Set for fast lookup
+    const existingPhones = new Set(
+      existingByPhone.map((e) => e.ContactNumber).filter(Boolean)
+    );
 
     const imported = [];
     const duplicates = [];
@@ -365,10 +381,19 @@ export const importCustomers = async (req, res, next) => {
     // --------------------------------------------------
     for (const row of valid) {
       // Duplicate check by email only
-      if (row.Email && existingEmails.has(row.Email)) {
+      /* if (row.Email && existingEmails.has(row.Email)) {
         duplicates.push(row);
         continue;
+      } */
+      // Duplicate check by ContactNumber
+      const isDuplicate =
+        row.ContactNumber && existingPhones.has(row.ContactNumber);
+
+      if (isDuplicate) {
+        duplicates.push(row);
+        // ✔ DO NOT SKIP — duplicates should still be inserted
       }
+
 
       try {
         // Auto-create master records (but we only store strings on customer)
@@ -392,6 +417,8 @@ export const importCustomers = async (req, res, next) => {
         if (row.Location) {
           await getOrCreateLocation(row.Location, row.City || "Default");
         }
+        
+
 
         // Create customer (Customer stores strings as before)
         const created = await prisma.customer.create({
@@ -405,8 +432,11 @@ export const importCustomers = async (req, res, next) => {
 
         imported.push({ ...row, id: created.id });
 
-        if (row.Email) existingEmails.add(row.Email);
+       /*  if (row.Email) existingEmails.add(row.Email); */
+       if (row.ContactNumber) existingPhones.add(row.ContactNumber);
       } catch (err) {
+        console.log("IMPORT FAILED:", err);
+
         failed.push({ ...row, error: err.message });
       }
     }
@@ -445,7 +475,7 @@ export const importCustomers = async (req, res, next) => {
     xlsx.writeFile(wb, filePath);
 
     // cleanup
-    fs.unlink(req.file.path, () => {});
+    fs.unlink(req.file.path, () => { });
 
     return res.status(200).json({
       success: true,
@@ -457,7 +487,7 @@ export const importCustomers = async (req, res, next) => {
       file: `/uploads/summaries/${path.basename(filePath)}`,
     });
   } catch (err) {
-    if (req.file?.path) fs.unlink(req.file.path, () => {});
+    if (req.file?.path) fs.unlink(req.file.path, () => { });
     next(new ApiError(500, err.message));
   }
 };
@@ -474,7 +504,7 @@ export const readCustomerHeaders = async (req, res, next) => {
     const sheet = workbook.Sheets[sheetName];
     const data = xlsx.utils.sheet_to_json(sheet, { header: 1 });
 
-    fs.unlink(req.file.path, () => {});
+    fs.unlink(req.file.path, () => { });
 
     const headers = data[0] || [];
     if (!headers.length)
@@ -486,7 +516,7 @@ export const readCustomerHeaders = async (req, res, next) => {
       headers,
     });
   } catch (error) {
-    if (req.file?.path) fs.unlink(req.file.path, () => {});
+    if (req.file?.path) fs.unlink(req.file.path, () => { });
     next(new ApiError(500, error.message));
   }
 };
